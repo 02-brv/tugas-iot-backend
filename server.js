@@ -3,15 +3,12 @@ const express = require('express');
 const session = require('express-session');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const path = require('path');
 const app = express();
-
-// Tambahkan ini agar link utama otomatis diarahkan ke halaman login
-app.get('/', (req, res) => {
-    res.redirect('/login');
-});
 
 // --- Konfigurasi ---
 app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(session({ 
@@ -20,21 +17,24 @@ app.use(session({
     saveUninitialized: true 
 }));
 
-// --- Koneksi Database (Optimasi untuk Serverless) ---
+// --- Koneksi Database (Optimasi Serverless) ---
 const connectDB = async () => {
     if (mongoose.connection.readyState >= 1) return;
     return mongoose.connect(process.env.DB_URL);
 };
 
+// --- Model ---
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true },
     password: { type: String, required: true }
 });
-const User = mongoose.model('User', UserSchema);
+// Pencegahan error jika model sudah ada saat re-deploy di Vercel
+const User = mongoose.models.User || mongoose.model('User', UserSchema);
 
 // --- ROUTES ---
 
-// API Route untuk Postman
+app.get('/', (req, res) => res.redirect('/login'));
+
 app.post('/api/register', async (req, res) => {
     await connectDB();
     const { username, password } = req.body;
@@ -43,7 +43,6 @@ app.post('/api/register', async (req, res) => {
     res.json({ message: 'User berhasil didaftarkan via API!' });
 });
 
-// Web Route untuk Browser
 app.post('/register', async (req, res) => {
     await connectDB();
     const { username, password } = req.body;
@@ -73,5 +72,4 @@ app.get('/home', (req, res) => {
 });
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
 
-// Ekspor untuk Vercel
 module.exports = app;
